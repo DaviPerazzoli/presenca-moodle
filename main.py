@@ -17,97 +17,92 @@ SENHA = os.getenv("MOODLE_SENHA")
 URL_PRESENCA = os.getenv("MOODLE_URL")
 
 def realizar_login(driver):
-    """Função dedicada a fazer o login, lidando com a tela intermediária e a tela da UFSC."""
     try:
-        print("\n[Login] Verificando se há tela intermediária do Moodle...")
+        print("\n[Login] Verificando tela inicial...")
         try:
             botao_continuar = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[@type='submit' and contains(text(), 'Continuar')]"))
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Continuar')]"))
             )
             botao_continuar.click()
-            print("[Login] Botão 'Continuar' clicado. Indo para a tela da UFSC...")
-        except Exception:
-            pass # Sem tela intermediária, apenas segue
+        except:
+            pass
 
-        print("[Login] Aguardando a página de login da UFSC...")
         campo_usuario = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "username")))
         driver.find_element(By.ID, "password").send_keys(SENHA)
         campo_usuario.send_keys(USUARIO) # type: ignore
-        
         driver.find_element(By.NAME, "submit").click()
-        print("[Login] Credenciais enviadas! Aguardando o sistema processar...")
         time.sleep(5) 
-        
     except Exception as e:
-        print(f"[Login] Erro crítico na etapa de login: {e}")
-        input("Faça o login manualmente no navegador e aperte ENTER aqui para o bot continuar...")
-
+        print(f"[Login] Erro: {e}")
+        input("Faça login manualmente e aperte ENTER aqui...")
 
 def iniciar_bot():
-    if not USUARIO or not SENHA or not URL_PRESENCA:
-        print("Erro: Verifique seu arquivo .env")
-        return
-
     servico = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=servico) # type: ignore
-    
-    # Primeiro acesso e login inicial
     driver.get(URL_PRESENCA)
     realizar_login(driver)
 
-    print("\nIniciando o monitoramento da presença...")
+    print("\nMonitorando presença...")
     
     while True:
         try:
             driver.get(URL_PRESENCA)
-            time.sleep(3) # Pausa rápida para garantir carregamento do DOM
+            time.sleep(2)
             
-            # --- VERIFICAÇÃO DE SESSÃO EXPIRADA ---
-            # Se encontrar o campo 'username' ou o botão 'Continuar', significa que fomos deslogados
-            deslogado = driver.find_elements(By.ID, "username") or driver.find_elements(By.XPATH, "//button[@type='submit' and contains(text(), 'Continuar')]")
-            
-            if deslogado:
-                print("\n[!] Sessão expirada ou redirecionamento detectado! Refazendo o login...")
+            # Detecção de deslogado
+            if driver.find_elements(By.ID, "username"):
                 realizar_login(driver)
-                continue # Pula o resto do loop e recomeça lá de cima (dá o get(URL) novamente)
-            
-            # --- BUSCA A PRESENÇA ---
+                continue
+
             links = driver.find_elements(By.PARTIAL_LINK_TEXT, "presença")
             
             if len(links) > 0:
-                print("\n[!] Presença detectada! Tentando marcar automaticamente...")
+                print("\n[!] PRESENÇA DETECTADA!")
+                # TOCA O SOM IMEDIATAMENTE AO DETECTAR
+                for _ in range(5):
+                    winsound.Beep(2500, 500)
+                
+                print("Tentando marcar automaticamente...")
                 links[0].click() 
                 
                 try:
-                    # Espera rádio button e clica
-                    opcao = WebDriverWait(driver, 10).until(
-                        EC.element_to_be_clickable((By.XPATH, "//label[contains(., '2 presenças') or contains(., 'Presente')]/preceding-sibling::input[@type='radio']"))
-                    )
-                    opcao.click()
+                    # 1. Seleciona o Radio Button (Usando o ID que você passou)
+                    # NOTA: Se esse ID mudar na próxima aula, usaremos o seletor por NOME abaixo
+                    wait = WebDriverWait(driver, 10)
+                    try:
+                        radio = wait.until(EC.element_to_be_clickable((By.ID, "id_status_247837")))
+                    except:
+                        # Se o ID mudou, tenta pelo nome 'status' e pega a primeira opção (geralmente 'Presente')
+                        radio = wait.until(EC.element_to_be_clickable((By.NAME, "status")))
+                    
+                    radio.click()
                     print("Opção selecionada.")
                     
-                    # Clica em salvar
-                    driver.find_element(By.ID, "id_submitbutton").click()
-                    print("SUCESSO: Presença anotada automaticamente!")
+                    # 2. Clica no botão Salvar (Usando o ID que você passou)
+                    botao_salvar = driver.find_element(By.ID, "id_submitbutton")
+                    botao_salvar.click()
                     
-                    for _ in range(3):
-                        winsound.Beep(2500, 600)
-                        time.sleep(0.2)
+                    print("SUCESSO TOTAL: Presença enviada!")
+                    winsound.Beep(3000, 1000) # Som de vitória
                     
                 except Exception as e_automacao:
-                    print(f"Erro ao preencher: {e_automacao}")
-                    winsound.Beep(1000, 3000)
+                    print(f"Erro na automação: {e_automacao}")
+                    print("CORRA! A página está aberta, mas o bot falhou em clicar. MARQUE MANUALMENTE!")
+                    for _ in range(10): winsound.Beep(1000, 200) # Alerta de erro
                 
-                break # Encerra o script pois o trabalho acabou
+                # MANTÉM O NAVEGADOR ABERTO PARA VOCÊ CONFERIR
+                input("\nPresença processada. Confira o navegador e aperte ENTER para fechar o script...")
+                break 
                 
             else:
-                espera = 60 + random.randint(1, 10)
+                espera = 60 + random.randint(1, 5)
                 print(f"Ainda fechado. Próxima checagem em {espera}s...")
                 time.sleep(espera)
                 
         except Exception as e:
-            print(f"Erro de conexão durante o loop: {e}")
-            time.sleep(60)
+            print(f"Erro no loop: {e}")
+            for _ in range(3): winsound.Beep(1000, 200)
+            time.sleep(10)
 
 if __name__ == "__main__":
     iniciar_bot()
