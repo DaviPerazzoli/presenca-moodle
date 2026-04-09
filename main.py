@@ -32,7 +32,7 @@ def realizar_login(driver):
         print("[Login] Aguardando a página de login da UFSC...")
         campo_usuario = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "username")))
         driver.find_element(By.ID, "password").send_keys(SENHA)
-        campo_usuario.send_keys(USUARIO)
+        campo_usuario.send_keys(USUARIO) # type: ignore
         
         driver.find_element(By.NAME, "submit").click()
         print("[Login] Credenciais enviadas! Aguardando o sistema processar...")
@@ -49,7 +49,7 @@ def iniciar_bot():
         return
 
     servico = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=servico)
+    driver = webdriver.Chrome(service=servico) # type: ignore
     
     # Primeiro acesso e login inicial
     driver.get(URL_PRESENCA)
