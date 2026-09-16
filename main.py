@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 load_dotenv()
@@ -15,6 +16,9 @@ load_dotenv()
 USUARIO = os.getenv("MOODLE_USUARIO")
 SENHA = os.getenv("MOODLE_SENHA")
 URL_PRESENCA = os.getenv("MOODLE_URL")
+RECRIAR_DRIVER_APOS = 3
+ESPERA_RETRY_MINIMA = 5
+ESPERA_RETRY_MAXIMA = 60
 
 def emitir_beep(frequencia, duracao_ms):
     """
@@ -62,6 +66,22 @@ def lidar_com_erro(mensagem_erro, erro_tecnico=None):
     print("Retomando execução...\n")
 
 
+def alertar_falha_transitoria(erro, primeira_falha):
+    if primeira_falha:
+        print("\n[!] Moodle indisponível. Tentando novamente até voltar...")
+        emitir_beep(1000, 400)
+    else:
+        print(f"[Retry] Falha temporária: {erro.__class__.__name__}")
+
+
+def encerrar_driver(driver):
+    if driver is not None:
+        try:
+            driver.quit()
+        except Exception:
+            pass
+
+
 def realizar_login(driver):
     try:
         print("\n[Login] Verificando tela inicial...")
@@ -89,24 +109,26 @@ def iniciar_bot():
         return
 
     servico = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=servico) # type: ignore
-    
-    try:
-        driver.get(URL_PRESENCA)
-        realizar_login(driver)
-    except Exception as e:
-        lidar_com_erro("Erro ao abrir o navegador ou carregar a página inicial.", e)
+    driver = None
+    falhas_carregamento = 0
+    alerta_emitido = False
 
     print("\nMonitorando presença...")
     
     while True:
         try:
+            if driver is None:
+                driver = webdriver.Chrome(service=servico) # type: ignore
+
             driver.get(URL_PRESENCA)
             time.sleep(2)
-            
-            # Detecção de deslogado
+
+            if falhas_carregamento:
+                print("[OK] Moodle acessível novamente. Monitoramento retomado.")
+            falhas_carregamento = 0
+            alerta_emitido = False
+
             if driver.find_elements(By.ID, "username") or driver.find_elements(By.XPATH, "//button[contains(text(), 'Continuar')]"):
-                print("\n[!] Sessão caiu. Tentando logar novamente...")
                 realizar_login(driver)
                 continue
 
@@ -151,8 +173,23 @@ def iniciar_bot():
                 print(f"[{time.strftime('%H:%M:%S')}] Ainda fechado. Próxima checagem em {espera}s...")
                 time.sleep(espera)
                 
-        except Exception as e:
-            lidar_com_erro("Erro inesperado durante o recarregamento da página.", e)
+        except WebDriverException as e:
+            falhas_carregamento += 1
+            alertar_falha_transitoria(e, not alerta_emitido)
+            alerta_emitido = True
+
+            if falhas_carregamento % RECRIAR_DRIVER_APOS == 0:
+                print("[Retry] ChromeDriver pode estar travado. Recriando o navegador...")
+                encerrar_driver(driver)
+                driver = None
+
+            espera = min(
+                ESPERA_RETRY_MINIMA * 2 ** (falhas_carregamento - 1),
+                ESPERA_RETRY_MAXIMA,
+            )
+            espera += random.randint(0, 5)
+            print(f"[Retry] Nova tentativa em {espera}s (falha {falhas_carregamento}).")
+            time.sleep(espera)
 
 
 if __name__ == "__main__":
