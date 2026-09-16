@@ -26,7 +26,7 @@ def emitir_beep(frequencia, duracao_ms):
     if sistema == "Windows":
         # O import é feito aqui dentro (Lazy Import) para não quebrar em outros SOs
         import winsound
-        winsound.Beep(frequencia, duracao_ms)
+        winsound.Beep(frequencia, duracao_ms) # type: ignore
         
     elif sistema == "Linux":
         # Converte milissegundos para segundos
