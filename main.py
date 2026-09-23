@@ -38,7 +38,7 @@ def emitir_beep(frequencia, duracao_ms):
         
         # Tenta usar o comando 'play' do pacote 'sox' para gerar a frequência exata
         # O redirecionamento '2> /dev/null' oculta as mensagens no terminal
-        resultado = os.system(f"play -nq -t alsa synth {duracao_seg} sine {frequencia} 2> /dev/null")
+        resultado = os.system(f"play -nq -t alsa synth {duracao_seg} sine {frequencia} vol 0.3 2> /dev/null")
         
         # Se o comando falhar (sox não instalado), usa o "Terminal Bell" como plano B
         if resultado != 0:
@@ -59,7 +59,7 @@ def lidar_com_erro(mensagem_erro, erro_tecnico=None):
     
     # Emite 3 beeps graves para alertar que algo falhou
     for _ in range(3):
-        emitir_beep(1000, 400)
+        emitir_beep(600, 400)
         time.sleep(0.1)
         
     input("\n>> O script foi pausado. Resolva manualmente no navegador se necessário e APERTE ENTER aqui para continuar...")
@@ -69,7 +69,7 @@ def lidar_com_erro(mensagem_erro, erro_tecnico=None):
 def alertar_falha_transitoria(erro, primeira_falha):
     if primeira_falha:
         print("\n[!] Moodle indisponível. Tentando novamente até voltar...")
-        emitir_beep(1000, 400)
+        emitir_beep(600, 400)
     else:
         print(f"[Retry] Falha temporária: {erro.__class__.__name__}")
 
@@ -140,7 +140,7 @@ def iniciar_bot():
                 
                 # Toca o som imediatamente ao detectar o botão (5 beeps agudos)
                 for _ in range(5):
-                    emitir_beep(2500, 500)
+                    emitir_beep(1200, 500)
                     time.sleep(0.1) # Pausa curta entre os beeps
                 
                 print("Entrando na página de anotação...")
@@ -158,7 +158,7 @@ def iniciar_bot():
                     botao_salvar.click()
                     
                     print("\nSUCESSO TOTAL: Presença enviada com sucesso!")
-                    emitir_beep(3000, 1500) # Som longo de vitória
+                    emitir_beep(800, 1500) # Som longo de vitória
                     
                     input("\n>> Presença finalizada. Confira o navegador e aperte ENTER para encerrar o script (ou feche a janela).")
                     break 
