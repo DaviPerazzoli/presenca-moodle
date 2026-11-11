@@ -82,6 +82,23 @@ def encerrar_driver(driver):
             pass
 
 
+def encontrar_primeiro(driver, seletores):
+    for by, valor in seletores:
+        elementos = driver.find_elements(by, valor)
+        if elementos:
+            return elementos[0]
+    return None
+
+
+def tela_de_login_visivel(driver):
+    return bool(
+        driver.find_elements(By.ID, "username")
+        or driver.find_elements(By.ID, "fm1")
+        or driver.find_elements(By.ID, "submitBtn")
+        or driver.find_elements(By.XPATH, "//button[contains(text(), 'Continuar')]")
+    )
+
+
 def realizar_login(driver):
     try:
         print("\n[Login] Verificando tela inicial...")
@@ -91,16 +108,38 @@ def realizar_login(driver):
             )
             botao_continuar.click()
         except Exception:
-            pass # Ignora se o botão continuar não existir
+            pass  # Ignora se o botão continuar não existir
 
-        campo_usuario = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "username")))
-        driver.find_element(By.ID, "password").send_keys(SENHA)
-        campo_usuario.send_keys(USUARIO) # type: ignore
-        driver.find_element(By.NAME, "submit").click()
-        time.sleep(5) 
-        
+        campo_usuario = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "username"))
+        )
+        campo_senha = driver.find_element(By.ID, "password")
+        campo_usuario.clear()
+        campo_senha.clear()
+        campo_usuario.send_keys(USUARIO)  # type: ignore
+        campo_senha.send_keys(SENHA)
+
+        botao_entrar = encontrar_primeiro(driver, [
+            (By.ID, "submitBtn"),
+            (By.CSS_SELECTOR, "#fm1 button[type='submit']"),
+            (By.XPATH, "//button[contains(normalize-space(.), 'Entrar')]"),
+            (By.NAME, "submit"),
+        ])
+        if botao_entrar is None:
+            raise RuntimeError("Botão de envio do login não encontrado.")
+        botao_entrar.click()
+
+        WebDriverWait(driver, 20).until(lambda d: not tela_de_login_visivel(d))
+        print("[Login] Autenticação concluída.")
+
     except Exception as e:
-        lidar_com_erro("Falha ao tentar realizar o login automático.", e)
+        if tela_de_login_visivel(driver):
+            lidar_com_erro(
+                "Login não concluiu: ainda na tela de autenticação (credenciais ou UI inesperada).",
+                e,
+            )
+        else:
+            lidar_com_erro("Falha ao tentar realizar o login automático.", e)
 
 
 def iniciar_bot():
@@ -128,7 +167,7 @@ def iniciar_bot():
             falhas_carregamento = 0
             alerta_emitido = False
 
-            if driver.find_elements(By.ID, "username") or driver.find_elements(By.XPATH, "//button[contains(text(), 'Continuar')]"):
+            if tela_de_login_visivel(driver):
                 realizar_login(driver)
                 continue
 
